@@ -1,7 +1,9 @@
 #include "clf_cbf/clf_cbf_node.hpp"
 #include "rclcpp_components/register_node_macro.hpp"
 #include "clf_cbf/cbf.h"
+#include "clf_cbf/cbf_dot.h"
 #include "clf_cbf/clf.h"
+#include "clf_cbf/clf_dot.h"
 
 
 namespace clf_cbf_node
@@ -25,6 +27,25 @@ int call_cbf(float& cbf_result, const Eigen::MatrixXf& x) {
     return status;
 }
 
+int call_cbf_dot(float& cbf_result, const Eigen::MatrixXf& x, const Eigen::MatrixXf& u, const Eigen::MatrixXf& p) {
+    const casadi_real* arg[3];
+    casadi_real* res[1];
+    casadi_real w[157] = {0};
+    casadi_int iw[0] = {};
+
+    arg[0] = x.data();
+    arg[1] = u.data();
+    arg[2] = p.data();
+    
+    casadi_real output_result = 0.0;
+    res[0] = &output_result;
+
+    int status = d_dx_f(arg, res, iw, w, 0);
+
+    cbf_result = output_result;
+    return status;
+}
+
 int call_clf(float& clf_result, const Eigen::MatrixXf& x, const Eigen::MatrixXf& p) {
     const casadi_real* arg[2];
     casadi_real* res[1];
@@ -40,6 +61,25 @@ int call_clf(float& clf_result, const Eigen::MatrixXf& x, const Eigen::MatrixXf&
     int status = lyapunov_f(arg, res, iw, w, 0);
 
     clf_result = output_result;
+    return status;
+}
+
+int call_clf_dot(float& cbf_result, const Eigen::MatrixXf& x, const Eigen::MatrixXf& u, const Eigen::MatrixXf& p) {
+    const casadi_real* arg[3];
+    casadi_real* res[1];
+    casadi_real w[92] = {0};
+    casadi_int iw[0] = {};
+
+    arg[0] = x.data();
+    arg[1] = u.data();
+    arg[2] = p.data();
+    
+    casadi_real output_result = 0.0;
+    res[0] = &output_result;
+
+    int status = V_dot_f(arg, res, iw, w, 0);
+
+    cbf_result = output_result;
     return status;
 }
 
@@ -66,12 +106,18 @@ ClfCbfNode::ClfCbfNode(const rclcpp::NodeOptions &options)
     // Init Variables
     x_ = Eigen::MatrixXf::Zero(22, 1);
     p_ = Eigen::MatrixXf::Zero(27, 1);
+    u_ = Eigen::MatrixXf::Zero(4, 1);
+
     p_(26, 0) = 1.0;
     result_ = Eigen::MatrixXf::Zero(1, 1);
     lyapunov_value_ = Eigen::MatrixXf::Zero(1, 1);
+    h_dot_value_ = Eigen::MatrixXf::Zero(1, 1);
+    l_dot_value_ = Eigen::MatrixXf::Zero(1, 1);
 
     result_ptr_ = result_.data();
     lyapunov_ptr_ = lyapunov_value_.data();
+    h_dot_ptr_ = h_dot_value_.data();
+    l_dot_ptr_ = l_dot_value_.data();
 
     // Subscriber to /quadrotor/odom
     quadrotor_odom_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -91,6 +137,10 @@ ClfCbfNode::ClfCbfNode(const rclcpp::NodeOptions &options)
         "/" + quad_name_ + "/position_cmd", 10, 
         std::bind(&ClfCbfNode::positionCmdCallback, this, std::placeholders::_1));
     
+    control_cmd_subscriber_ = this->create_subscription<quadrotor_msgs::msg::MotorSpeed>(
+        "/" + quad_name_ + "/rpm_cmd", 10, 
+        std::bind(&ClfCbfNode::controlCmdCallback, this, std::placeholders::_1));
+
     // Publisher for vector3_stamped
     clf_publisher_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/" + quad_name_ + "/" + "payload" + "/clf", 10);
     cbf_publisher_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/" + quad_name_ + "/" + "payload" + "/cbf", 10);
@@ -121,20 +171,30 @@ void ClfCbfNode::positionCmdCallback(const quadrotor_msgs::msg::PositionCommand:
     position_cmd_ = *msg;
 }
 
+void ClfCbfNode::controlCmdCallback(const quadrotor_msgs::msg::MotorSpeed::SharedPtr msg)
+{
+    control_cmd_ = *msg;
+}
+
 void ClfCbfNode::publishCamera()
 {   
     // Updates values
     updateStateFromQuadrotorOdometry();
     updateStateFromPayloadOdometry();
     updateStateFromPayloadCameraPoint();
-    updatePositionCmd();  
+    updatePositionCmd();
+    updateControlCmd();
 
     int status_cbf;
+    int status_cbf_dot;
     int status_clf;
+    int status_clf_dot;
 
     // Using CBF and CLF Casadi
     status_cbf = call_cbf(*(result_ptr_), x_);
     status_clf = call_clf(*(lyapunov_ptr_), x_, p_);
+    status_cbf_dot = call_cbf_dot(*(h_dot_ptr_), x_, u_, p_);
+    status_clf_dot = call_clf_dot(*(l_dot_ptr_), x_, u_, p_);
 
     // Publish vector as a point for cbf
     geometry_msgs::msg::PointStamped cbf_msg;
@@ -142,7 +202,7 @@ void ClfCbfNode::publishCamera()
     cbf_msg.header.stamp = this->get_clock()->now();
     cbf_msg.point.x = 0.0;
     cbf_msg.point.y = result_(0, 0);
-    cbf_msg.point.z = 0.0;
+    cbf_msg.point.z = h_dot_value_(0, 0);
     cbf_publisher_->publish(cbf_msg);
 
     // Publish vector as a point for clf
@@ -151,7 +211,7 @@ void ClfCbfNode::publishCamera()
     clf_msg.header.stamp = this->get_clock()->now();
     clf_msg.point.x = 0.0;
     clf_msg.point.y = lyapunov_value_(0, 0);
-    clf_msg.point.z = 0.0;
+    clf_msg.point.z = l_dot_value_(0, 0);
     clf_publisher_->publish(clf_msg);
 
 }
@@ -254,6 +314,18 @@ void ClfCbfNode::updatePositionCmd()
     p_(26, 0) = 1.0;
 }
 
+void ClfCbfNode::updateControlCmd()
+{
+    // Ensure x_ is the correct size (22x1 matrix as specified)
+    if (u_.rows() != 4 || u_.cols() != 1) {
+        RCLCPP_ERROR(this->get_logger(), "Matrix p_ has incorrect dimensions. Expected 22x1.");
+        return;
+    }
+    u_(0, 0)= control_cmd_.forces[0];
+    u_(1, 0)= control_cmd_.forces[1];
+    u_(2, 0)= control_cmd_.forces[2];
+    u_(3, 0)= control_cmd_.forces[3];
+}
 // Register the component
 RCLCPP_COMPONENTS_REGISTER_NODE(clf_cbf_node::ClfCbfNode)
 }  // namespace camera_projection_node
