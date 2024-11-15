@@ -9,6 +9,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(quadrotor_msgs REQUIRED)
 
 # List of dependencies
 set(dependencies
@@ -18,6 +19,7 @@ set(dependencies
   nav_msgs
   tf2_ros
   Eigen3
+  quadrotor_msgs
 )
 
 set(SHARED_LIBRARIES
