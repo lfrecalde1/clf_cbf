@@ -185,13 +185,13 @@ void ClfCbfNode::updateStateFromPayloadOdometry()
         RCLCPP_ERROR(this->get_logger(), "Matrix x_ has incorrect dimensions. Expected 22x1.");
         return;
     }
-    x_(0, 0) = quadrotor_odometry_.pose.pose.position.x;
-    x_(1, 0) = quadrotor_odometry_.pose.pose.position.y;
-    x_(2, 0) = quadrotor_odometry_.pose.pose.position.z;
+    x_(0, 0) = payload_odometry_.pose.pose.position.x;
+    x_(1, 0) = payload_odometry_.pose.pose.position.y;
+    x_(2, 0) = payload_odometry_.pose.pose.position.z;
 
-    x_(3, 0) = quadrotor_odometry_.twist.twist.linear.x;
-    x_(4, 0) = quadrotor_odometry_.twist.twist.linear.y;
-    x_(5, 0) = quadrotor_odometry_.twist.twist.linear.z;
+    x_(3, 0) = payload_odometry_.twist.twist.linear.x;
+    x_(4, 0) = payload_odometry_.twist.twist.linear.y;
+    x_(5, 0) = payload_odometry_.twist.twist.linear.z;
 }
 
 void ClfCbfNode::updateStateFromPayloadCameraPoint()

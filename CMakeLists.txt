@@ -65,5 +65,9 @@ install(DIRECTORY lib/
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(
+  DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
 # Export the package
 ament_package()
