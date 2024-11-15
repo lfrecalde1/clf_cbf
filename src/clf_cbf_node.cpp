@@ -84,7 +84,8 @@ int call_clf_dot(float& cbf_result, const Eigen::MatrixXf& x, const Eigen::Matri
 }
 
 ClfCbfNode::ClfCbfNode(const rclcpp::NodeOptions &options)
-    : Node("clf_cbf_node", options)
+    : Node("clf_cbf_node", options),
+    drone_bool_(false), payload_bool_(false), payload_camera_bool_(false), position_cmd_bool_(false), control_cmd_bool_(false)
 {
     // Declare parameters with default values
     this->declare_parameter("world_frame_id", std::string("world"));
@@ -154,30 +155,41 @@ ClfCbfNode::ClfCbfNode(const rclcpp::NodeOptions &options)
 void ClfCbfNode::quadrotorOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     quadrotor_odometry_ = *msg;
+    drone_bool_ = true;
 }
 
 void ClfCbfNode::payloadOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     payload_odometry_ = *msg;
+    payload_bool_ = true;
 }
 
 void ClfCbfNode::payloadPointCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
 {
     payload_camera_point_ = *msg;
+    payload_camera_bool_ = true;
 }
 
 void ClfCbfNode::positionCmdCallback(const quadrotor_msgs::msg::PositionCommand::SharedPtr msg)
 {
     position_cmd_ = *msg;
+    position_cmd_bool_ = true;
 }
 
 void ClfCbfNode::controlCmdCallback(const quadrotor_msgs::msg::MotorSpeed::SharedPtr msg)
 {
     control_cmd_ = *msg;
+    control_cmd_bool_ = true;
 }
 
 void ClfCbfNode::publishCamera()
-{   
+{  
+    // Safety check
+    if (!drone_bool_ || !payload_bool_ || !payload_camera_bool_ || !position_cmd_bool_ || !control_cmd_bool_) {
+        RCLCPP_WARN_ONCE(this->get_logger(), "Waiting for all topics to establish communication...");
+        return;
+    }
+
     // Updates values
     updateStateFromQuadrotorOdometry();
     updateStateFromPayloadOdometry();

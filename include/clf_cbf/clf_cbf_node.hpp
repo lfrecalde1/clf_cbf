@@ -72,6 +72,12 @@ private:
     float* h_dot_ptr_;
     float* l_dot_ptr_;
 
+    bool drone_bool_;
+    bool payload_bool_;
+    bool payload_camera_bool_;
+    bool position_cmd_bool_;
+    bool control_cmd_bool_;
+
 };
 }  // namespace clf_cbf_node
 
