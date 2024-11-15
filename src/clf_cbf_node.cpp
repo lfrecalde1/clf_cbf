@@ -11,8 +11,8 @@ namespace clf_cbf_node
 int call_cbf(float& cbf_result, const Eigen::MatrixXf& x) {
     const casadi_real* arg[1];
     casadi_real* res[1];
-    casadi_real w[h_f_SZ_W] = {0};
-    casadi_int iw[h_f_SZ_IW] = {};
+    casadi_real w[3] = {0};
+    casadi_int iw[0] = {};
 
     arg[0] = x.data();
     
@@ -28,8 +28,8 @@ int call_cbf(float& cbf_result, const Eigen::MatrixXf& x) {
 int call_clf(float& clf_result, const Eigen::MatrixXf& x, const Eigen::MatrixXf& p) {
     const casadi_real* arg[2];
     casadi_real* res[1];
-    casadi_real w[lyapunov_f_SZ_W] = {0};
-    casadi_int iw[lyapunov_f_SZ_IW] = {};
+    casadi_real w[33] = {0};
+    casadi_int iw[0] = {};
 
     arg[0] = x.data();
     arg[1] = p.data();
@@ -104,31 +104,34 @@ ClfCbfNode::ClfCbfNode(const rclcpp::NodeOptions &options)
 void ClfCbfNode::quadrotorOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     quadrotor_odometry_ = *msg;
-    updateStateFromQuadrotorOdometry();
 }
 
 void ClfCbfNode::payloadOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     payload_odometry_ = *msg;
-    updateStateFromPayloadOdometry();
 }
 
 void ClfCbfNode::payloadPointCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
 {
     payload_camera_point_ = *msg;
-    updateStateFromPayloadCameraPoint();
 }
 
 void ClfCbfNode::positionCmdCallback(const quadrotor_msgs::msg::PositionCommand::SharedPtr msg)
 {
     position_cmd_ = *msg;
-    updatePositionCmd();  
 }
 
 void ClfCbfNode::publishCamera()
-{
+{   
+    // Updates values
+    updateStateFromQuadrotorOdometry();
+    updateStateFromPayloadOdometry();
+    updateStateFromPayloadCameraPoint();
+    updatePositionCmd();  
+
     int status_cbf;
     int status_clf;
+
     // Using CBF and CLF Casadi
     status_cbf = call_cbf(*(result_ptr_), x_);
     status_clf = call_clf(*(lyapunov_ptr_), x_, p_);
