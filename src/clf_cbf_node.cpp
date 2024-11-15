@@ -138,7 +138,7 @@ ClfCbfNode::ClfCbfNode(const rclcpp::NodeOptions &options)
         std::bind(&ClfCbfNode::positionCmdCallback, this, std::placeholders::_1));
     
     control_cmd_subscriber_ = this->create_subscription<quadrotor_msgs::msg::MotorSpeed>(
-        "/" + quad_name_ + "/rpm_cmd", 10, 
+        "/" + quad_name_ + "/aux_rpm_cmd", 10, 
         std::bind(&ClfCbfNode::controlCmdCallback, this, std::placeholders::_1));
 
     // Publisher for vector3_stamped
@@ -189,6 +189,7 @@ void ClfCbfNode::publishCamera()
     int status_cbf_dot;
     int status_clf;
     int status_clf_dot;
+    float gamma = 1.0;
 
     // Using CBF and CLF Casadi
     status_cbf = call_cbf(*(result_ptr_), x_);
@@ -200,18 +201,18 @@ void ClfCbfNode::publishCamera()
     geometry_msgs::msg::PointStamped cbf_msg;
     cbf_msg.header.frame_id = camera_name_;
     cbf_msg.header.stamp = this->get_clock()->now();
-    cbf_msg.point.x = 0.0;
+    cbf_msg.point.x = -gamma*result_(0.0) + h_dot_value_(0, 0);
     cbf_msg.point.y = result_(0, 0);
-    cbf_msg.point.z = h_dot_value_(0, 0);
+    cbf_msg.point.z = 0.0;
     cbf_publisher_->publish(cbf_msg);
 
     // Publish vector as a point for clf
     geometry_msgs::msg::PointStamped clf_msg;
     clf_msg.header.frame_id = camera_name_;
     clf_msg.header.stamp = this->get_clock()->now();
-    clf_msg.point.x = 0.0;
+    clf_msg.point.x = l_dot_value_(0, 0) + 0.1*lyapunov_value_(0, 0);
     clf_msg.point.y = lyapunov_value_(0, 0);
-    clf_msg.point.z = l_dot_value_(0, 0);
+    clf_msg.point.z = 0.0;
     clf_publisher_->publish(clf_msg);
 
 }
