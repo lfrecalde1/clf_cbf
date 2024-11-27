@@ -30,7 +30,7 @@ int call_cbf(float& cbf_result, const Eigen::MatrixXf& x) {
 int call_cbf_dot(float& cbf_result, const Eigen::MatrixXf& x, const Eigen::MatrixXf& u, const Eigen::MatrixXf& p) {
     const casadi_real* arg[3];
     casadi_real* res[1];
-    casadi_real w[157] = {0};
+    casadi_real w[300] = {0};
     casadi_int iw[0] = {};
 
     arg[0] = x.data();
@@ -122,7 +122,7 @@ ClfCbfNode::ClfCbfNode(const rclcpp::NodeOptions &options)
 
     // Subscriber to /quadrotor/odom
     quadrotor_odom_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/" + quad_name_ + "/odom", 10, 
+        "/" + quad_name_ + "/ros2_control_odom", 10, 
         std::bind(&ClfCbfNode::quadrotorOdomCallback, this, std::placeholders::_1));
 
     // Subscriber to /quadrotor/payload/odom
@@ -204,16 +204,21 @@ void ClfCbfNode::publishCamera()
     float gamma = 1.0;
 
     // Using CBF and CLF Casadi
+    //std::cout << "test 1 " << std::endl;
     status_cbf = call_cbf(*(result_ptr_), x_);
+    //std::cout << "test 2 " << std::endl;
     status_clf = call_clf(*(lyapunov_ptr_), x_, p_);
+    //std::cout << "test 3 " << std::endl;
     status_cbf_dot = call_cbf_dot(*(h_dot_ptr_), x_, u_, p_);
+    //std::cout << "test 4 " << std::endl;
     status_clf_dot = call_clf_dot(*(l_dot_ptr_), x_, u_, p_);
+    //std::cout << "test 5 " << std::endl;
 
     // Publish vector as a point for cbf
     geometry_msgs::msg::PointStamped cbf_msg;
     cbf_msg.header.frame_id = camera_name_;
     cbf_msg.header.stamp = this->get_clock()->now();
-    cbf_msg.point.x = -gamma*result_(0.0) + h_dot_value_(0, 0);
+    cbf_msg.point.x = -result_(0.0) + h_dot_value_(0, 0);
     cbf_msg.point.y = result_(0, 0);
     cbf_msg.point.z = 0.0;
     cbf_publisher_->publish(cbf_msg);

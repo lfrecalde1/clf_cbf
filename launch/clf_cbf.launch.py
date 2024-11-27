@@ -7,7 +7,7 @@ import os
 
 def generate_launch_description():
     # Declare arguments
-    launch_args = [ DeclareLaunchArgument('name', default_value='quadrotor'),
+    launch_args = [ DeclareLaunchArgument('name', default_value='raxl5'),
                     DeclareLaunchArgument('world_frame_id', default_value='world'),
                     DeclareLaunchArgument('camera_frame', default_value='camera'),
                 ]
